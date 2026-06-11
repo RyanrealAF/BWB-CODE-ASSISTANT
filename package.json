@@ -14,8 +14,19 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["termux", "claude", "code-assistant", "ai", "repl"],
+  "keywords": [
+    "termux",
+    "claude",
+    "code-assistant",
+    "ai",
+    "repl"
+  ],
   "author": "RyanrealAF — buildwhilebleeding.com",
   "license": "MIT",
-  "dependencies": {}
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@google/generative-ai": "^0.24.1",
+    "commander": "^14.0.3",
+    "sqlite3": "^6.0.1"
+  }
 }
