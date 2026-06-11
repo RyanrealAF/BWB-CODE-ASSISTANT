@@ -1,0 +1,48 @@
+﻿BWB Urban Myth Engine – Development Guide
+Overview
+This document defines the architecture and implementation plan for a CLI-based Urban Myth Engine built for Termux + Node.js environments. The system uses dual-model inference (Claude + Gemini), a persistent SQLite archetype cache, and a token-aware request router to ensure stability under API constraints.
+Core Architecture
+Pipeline: Seed → Claude Narrative → Gemini Distortion → Fusion Output
+Additional layers: Archetype Cache (SQLite persistence), Token Router (request safety), CLI Command Layer (BWB).
+Project Structure
+bwb-code-assistant/
+- index.js (CLI entry)
+- commands/myth.js (command handler)
+- engine/urban-myth-engine.js
+- engine/archetype-cache.js
+- engine/token-router.js
+- data/archetypes.db
+CLI Commands
+bwb myth "seed" → Generate myth
+bwb myth archetypes → List archetypes
+bwb myth history <name> → View archetype memory
+bwb myth reset → Clear database
+Urban Myth Engine
+Dual-inference system:
+- Claude: narrative coherence, structure, grounded storytelling
+- Gemini: controlled distortion, symbolic anomalies
+- Fusion layer: preserves contradiction without resolution
+Archetype Cache (SQLite)
+Persistent memory system storing archetype evolution:
+- name (primary key)
+- count (usage frequency)
+- mutations (recent distortion history)
+- lastSeen (timestamp)
+
+Purpose: enables myth continuity and evolving narrative pressure across sessions.
+Token-Aware Request Router
+Prevents API overload (TPM limits) by:
+- Estimating token usage before requests
+- Trimming oversized prompts automatically
+- Compressing archetype memory into state packets
+- Falling back to secondary model if primary fails
+- Enforcing 6000 TPM safety ceiling with margin buffer
+System Behavior Model
+The system behaves as a controlled narrative generator with persistent memory. Repeated seeds evolve over time due to archetype mutation tracking, creating emergent mythology patterns.
+Deployment Environment
+Designed for Android Termux + Node.js runtime:
+- Acode used for editing
+- Termux used for execution
+- Git used for sync layer
+- SQLite used for persistent memory
+- CLI used as primary interface
