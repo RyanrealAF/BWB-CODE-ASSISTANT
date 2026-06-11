@@ -1,0 +1,22 @@
+{
+  "name": "bwb-code-assistant",
+  "version": "1.0.0",
+  "description": "Interactive Claude/Gemini-powered code assistant REPL for Termux",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "bwb": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
+    "@google/genai": "^0.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "RyanrealAF / Build While Bleeding",
+  "license": "MIT"
+}
