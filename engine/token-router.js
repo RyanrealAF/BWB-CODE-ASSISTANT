@@ -25,19 +25,16 @@ export function buildSafePayload(systemPrompt, messages, archetypeContext = "") 
   }
 
   const lastMsg = trimmed[trimmed.length - 1];
-  if (lastMsg) {
-    lastMsg.content = trimToLimit(lastMsg.content, available - 200);
-  }
-
+  if (lastMsg) lastMsg.content = trimToLimit(lastMsg.content, available - 200);
   return trimmed;
 }
 
 export function compressArchetypeContext(archetypes) {
   if (!archetypes.length) return "";
-  const lines = archetypes.slice(0, 5).map(a => {
+  const lines = archetypes.slice(0, 3).map(a => {
     const mutations = JSON.parse(a.mutations || "[]");
-    const last = mutations.slice(-1)[0] || "none";
-    return "[" + a.name + "] seen:" + a.count + " last_mutation:" + last;
+    const last = (mutations.slice(-1)[0] || "none").slice(0, 50);
+    return a.name + ":" + a.count + "x|" + last;
   });
-  return "ARCHETYPE MEMORY:\n" + lines.join("\n");
+  return "ARCH:" + lines.join(";");
 }

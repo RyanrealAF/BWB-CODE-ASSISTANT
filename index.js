@@ -17,7 +17,7 @@ const CONFIG = {
   max_history_turns:  6,
   auto_flush_turns:   10,
   context_dir:        process.cwd(),
-  api_key_env:        "GROQ_API_KEY",
+  groq_api_key:       process.env.05TG0XFtCTaSNu8cWryuWGdyb3FYfhjV25IZ3KXr8TDMEuAAtc3O || "REPLACE_WITH_YOUR_API_KEY",
   history_file:       path.join(os.homedir(), ".bwb_repl_history.json"),
   notes_file:         path.join(os.homedir(), ".bwb_notes.json"),
   cf_account_id:      process.env.CF_ACCOUNT_ID  || "REPLACE_WITH_ACCOUNT_ID",
@@ -484,10 +484,10 @@ function fsBatchLoad(dirPath, extensions, loadedFiles) {
 }
 
 async function main() {
-  const apiKey = process.env[CONFIG.api_key_env];
-  if (!apiKey) {
-    print(C.red, `Error: ${CONFIG.api_key_env} not set.`);
-    print(C.gray, `Run: export ${CONFIG.api_key_env}=your_key`);
+  const apiKey = CONFIG.groq_api_key;
+  if (!apiKey || apiKey === "REPLACE_WITH_YOUR_API_KEY") {
+    print(C.red, "Error: GROQ_API_KEY not set.");
+    print(C.gray, "Please add your GROQ_API_KEY to index.js or set it as an environment variable.");
     process.exit(1);
   }
 

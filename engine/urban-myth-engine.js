@@ -5,23 +5,9 @@ import { initDB, upsertArchetype, listArchetypes, getArchetypeHistory, resetDB }
 const NARRATIVE_MODEL  = "llama-3.1-8b-instant";
 const DISTORTION_MODEL = "llama-3.3-70b-versatile";
 
-const SYSTEM_NARRATIVE = `You are the BWB Urban Myth Engine — narrative layer.
-Your role: take a seed and generate a grounded urban myth. Raw, specific, street-level.
-No fantasy tropes. No heroes. Real locations, real tensions, real consequences.
-Write in second person present tense. 150 words max. End mid-thought.`;
-
-const SYSTEM_DISTORTION = `You are the BWB Urban Myth Engine — distortion layer.
-Your role: take a narrative and inject controlled symbolic anomalies.
-Rules:
-- Preserve the original structure and specificity
-- Insert exactly one impossible detail that feels inevitable
-- Do not explain the anomaly
-- Do not resolve contradictions
-- 150 words max`;
-
-const SYSTEM_ARCHETYPE_EXTRACT = `You are an archetype extractor.
-Read the myth and return ONLY a JSON array of 1-3 archetype names (single words or short phrases).
-No explanation. No markdown. Example: ["The Witness","The Corner","The Signal"]`;
+const SYS_NARRATIVE  = "Urban myth engine. Input: seed. Output: 100-word street-level myth, second person present tense, end mid-thought. No fantasy. No heroes.";
+const SYS_DISTORTION = "Input: myth. Output: same myth with one impossible-but-inevitable detail injected. No explanation. No resolution. 100 words max.";
+const SYS_ARCHETYPE  = "Input: myth. Output: JSON array only, 1-3 archetype names. Example: [\"The Corner\",\"The Signal\"]";
 
 export class UrbanMythEngine {
   constructor(apiKey) {
@@ -39,39 +25,26 @@ export class UrbanMythEngine {
 
     const archetypes = listArchetypes();
     const archCtx    = compressArchetypeContext(archetypes);
+    const seedLine   = archCtx ? archCtx + "\nSeed: " + seed : "Seed: " + seed;
 
-    const seedLine = archCtx ? archCtx + "\n\nSeed: " + seed : "Seed: " + seed;
-
-    const narrativeMessages = buildSafePayload(
-      SYSTEM_NARRATIVE,
-      [{ role: "user", content: seedLine }],
-      archCtx
-    );
-
+    const narrativeMessages = buildSafePayload(SYS_NARRATIVE, [{ role: "user", content: seedLine }], archCtx);
     const narrativeResp = await this.groq.chat.completions.create({
-      model:      NARRATIVE_MODEL,
-      max_tokens: 400,
-      messages:   [{ role: "system", content: SYSTEM_NARRATIVE }, ...narrativeMessages],
+      model: NARRATIVE_MODEL, max_tokens: 200,
+      messages: [{ role: "system", content: SYS_NARRATIVE }, ...narrativeMessages],
     });
     const narrative = narrativeResp.choices[0]?.message?.content || "";
 
-    const distortionMessages = buildSafePayload(
-      SYSTEM_DISTORTION,
-      [{ role: "user", content: narrative }]
-    );
-
+    const distortionMessages = buildSafePayload(SYS_DISTORTION, [{ role: "user", content: narrative }]);
     const distortionResp = await this.groq.chat.completions.create({
-      model:      DISTORTION_MODEL,
-      max_tokens: 400,
-      messages:   [{ role: "system", content: SYSTEM_DISTORTION }, ...distortionMessages],
+      model: DISTORTION_MODEL, max_tokens: 200,
+      messages: [{ role: "system", content: SYS_DISTORTION }, ...distortionMessages],
     });
     const distorted = distortionResp.choices[0]?.message?.content || "";
 
     const archetypeResp = await this.groq.chat.completions.create({
-      model:      NARRATIVE_MODEL,
-      max_tokens: 100,
-      messages:   [
-        { role: "system", content: SYSTEM_ARCHETYPE_EXTRACT },
+      model: NARRATIVE_MODEL, max_tokens: 60,
+      messages: [
+        { role: "system", content: SYS_ARCHETYPE },
         { role: "user",   content: distorted },
       ],
     });
@@ -83,7 +56,7 @@ export class UrbanMythEngine {
     } catch (_) {}
 
     for (const name of extractedArchetypes) {
-      upsertArchetype(name, distorted.slice(0, 100));
+      upsertArchetype(name, distorted.slice(0, 50));
     }
 
     return { seed, narrative, distorted, archetypes: extractedArchetypes };
