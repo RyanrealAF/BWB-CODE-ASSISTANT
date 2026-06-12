@@ -15,8 +15,6 @@
     "@anthropic-ai/sdk": "^0.102.0",
     "@google/genai": "latest",
     "dotenv": "^16.4.5",
-    "firebase": "^9.6.1",
-    "firebase-admin": "^11.0.1",
     "groq-sdk": "^1.2.1",
     "sql.js": "^1.14.1"
   },
