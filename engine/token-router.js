@@ -1,60 +1,43 @@
-const { Anthropic } = require('@anthropic-ai/sdk');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const TPM_CEILING = 5800;
+const AVG_CHARS_PER_TOKEN = 4;
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-class TokenRouter {
-  constructor(maxTokens = 6000) {
-    this.maxTokens = maxTokens;
-  }
-
-  async claude(prompt) {
-    try {
-      const trimmedPrompt = this.trimPrompt(prompt);
-      const response = await anthropic.messages.create({
-        model: 'claude-3-opus-20240229',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: trimmedPrompt }],
-      });
-      return response.content[0].text;
-    } catch (error) {
-      console.error('Claude API error:', error);
-      // Fallback to Gemini
-      return this.gemini(prompt);
-    }
-  }
-
-  async gemini(prompt) {
-    try {
-      const trimmedPrompt = this.trimPrompt(prompt);
-      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-      const result = await model.generateContent(trimmedPrompt);
-      const response = await result.response;
-      return response.text();
-    } catch (error) {
-      console.error('Gemini API error:', error);
-      return 'Error: Unable to generate response from both models.';
-    }
-  }
-
-  estimateTokens(text) {
-    // A rough estimate of token count
-    return Math.ceil(text.length / 4);
-  }
-
-  trimPrompt(prompt) {
-    let tokens = this.estimateTokens(prompt);
-    if (tokens > this.maxTokens) {
-      const excessTokens = tokens - this.maxTokens;
-      const excessChars = excessTokens * 4;
-      return prompt.substring(excessChars);
-    }
-    return prompt;
-  }
+export function estimateTokens(text) {
+  return Math.ceil((text || "").length / AVG_CHARS_PER_TOKEN);
 }
 
-module.exports = TokenRouter;
+export function trimToLimit(text, maxTokens) {
+  const maxChars = maxTokens * AVG_CHARS_PER_TOKEN;
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars) + "\n[...trimmed]";
+}
+
+export function buildSafePayload(systemPrompt, messages, archetypeContext = "") {
+  const systemTokens    = estimateTokens(systemPrompt);
+  const archetypeTokens = estimateTokens(archetypeContext);
+  const overhead        = 200;
+  const available       = TPM_CEILING - systemTokens - archetypeTokens - overhead;
+
+  let trimmed = [...messages];
+  while (trimmed.length > 1) {
+    const total = trimmed.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+    if (total <= available) break;
+    trimmed = trimmed.slice(2);
+  }
+
+  const lastMsg = trimmed[trimmed.length - 1];
+  if (lastMsg) {
+    lastMsg.content = trimToLimit(lastMsg.content, available - 200);
+  }
+
+  return trimmed;
+}
+
+export function compressArchetypeContext(archetypes) {
+  if (!archetypes.length) return "";
+  const lines = archetypes.slice(0, 5).map(a => {
+    const mutations = JSON.parse(a.mutations || "[]");
+    const last = mutations.slice(-1)[0] || "none";
+    return "[" + a.name + "] seen:" + a.count + " last_mutation:" + last;
+  });
+  return "ARCHETYPE MEMORY:\n" + lines.join("\n");
+}

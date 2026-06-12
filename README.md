@@ -1,107 +1,87 @@
 # BWB Code Assistant
-**Build While Bleeding — Termux Code Assistant**
-Powered by Claude · buildwhilebleeding.com
 
-An interactive REPL that loads your entire project into context and gives you a persistent Claude-backed chat session about the codebase. Zero external dependencies beyond Node.js.
-
----
-
-## Requirements
-
-- Termux with Node.js ≥ 18
-- Anthropic API key (`sk-ant-...`)
+Interactive Claude-powered code assistant REPL for Termux.
+Persistent chat session with codebase file injection and streaming output.
 
 ---
 
 ## Install
 
 ```bash
-bash setup.sh
-```
+# 1. Install Node (if not already)
+pkg install nodejs
 
-Or manually:
-```bash
-chmod +x src/repl.js
-```
+# 2. Install dependencies
+cd bwb-code-assistant
+npm install
 
----
+# 3. Set your API key (add to ~/.bashrc to persist across sessions)
+export ANTHROPIC_API_KEY=your_key_here
 
-## Usage
-
-```bash
-# Point at a project directory
-node src/repl.js ~/projects/my-worker
-
-# If installed globally
-bwb-assist ~/projects/my-worker
-
-# With API key inline
-ANTHROPIC_API_KEY=sk-ant-... node src/repl.js ~/projects/my-worker
-
-# Defaults to current directory if no path given
-cd ~/projects/my-worker && node ~/bwb-code-assistant/src/repl.js
+# 4. Make executable and link globally (optional)
+chmod +x index.js
+npm link
 ```
 
 ---
 
-## REPL Commands
+## Run
+
+```bash
+node index.js
+# or if npm linked:
+bwb
+```
+
+---
+
+## Commands
 
 | Command | Action |
 |---|---|
-| `/reload` | Rescan project files and reset history |
-| `/clear` | Clear chat history (keep context) |
-| `/files` | List all files loaded into context |
-| `/exit` | Quit |
+| `:load <file>` | Inject file into context |
+| `:scan [dir] [.ext]` | List files (e.g. `:scan src .js .ts`) |
+| `:context` | Show loaded files |
+| `:clear` | Drop file context, keep history |
+| `:reset` | Wipe files + history |
+| `:dir [path]` | Change working directory |
+| `:pwd` | Print working directory |
+| `:save` | Force-save history |
+| `:exit` | Quit |
+| `:help` | Command list |
 
 ---
 
-## Context Rules
+## Example session
 
-The context builder automatically:
-- Includes: `.js .ts .py .sh .json .toml .yaml .md .html .css .sql .tf`
-- Excludes: `node_modules`, `.git`, `dist`, `.wrangler`, `.env`
-- Caps: 100KB per file, 80K chars total context
-- Truncates large files with a notice rather than silently cutting
+```
+You: :scan . .js
+You: :load src/worker.js
+You: :load wrangler.toml
+You: KV write is silently failing on second request — why?
+```
+
+File contents + question go into a single context window.
+Responses stream token-by-token to stdout.
+History persists at ~/.bwb_repl_history.json between sessions.
 
 ---
 
-## API Key Setup (Persistent)
+## Config (index.js top)
 
-Add to `~/.bashrc` in Termux:
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Then:
-```bash
-source ~/.bashrc
-```
-
----
-
-## Project Structure
-
-```
-bwb-code-assistant/
-├── src/
-│   ├── repl.js       # REPL loop and command handling
-│   ├── claude.js     # Anthropic API client (streaming SSE)
-│   ├── context.js    # Project file scanner + context builder
-│   └── ui.js         # Terminal colors and banner
-├── package.json
-├── setup.sh
-└── README.md
+```js
+const CONFIG = {
+  model: "claude-sonnet-4-6",
+  max_tokens: 4096,
+  max_file_bytes: 80_000,
+  max_history_turns: 20,
+};
 ```
 
 ---
 
-## Extending
+## Notes
 
-**Add a new file type to scan:** Edit `INCLUDED_EXTENSIONS` in `src/context.js`.
-
-**Change the model:** Edit `MODEL` in `src/claude.js`.
-
-**Increase context window:** Edit `MAX_TOTAL_CHARS` in `src/context.js` — stay under the model's input limit (~180K tokens for Sonnet).
-
-**Add a slash command:** Add a new `if (cmd === "/yourcommand")` block in `handleCommand()` in `src/repl.js`.
+- Requires Node 18+ (`pkg install nodejs` in Termux)
+- Files are injected per-message only — nothing stored externally
+- Use `:reset` when switching projects to prevent context bleed

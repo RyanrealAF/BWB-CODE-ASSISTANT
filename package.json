@@ -1,34 +1,24 @@
 {
   "name": "bwb-code-assistant",
   "version": "1.0.0",
-  "description": "Interactive Claude-powered code assistant for Termux — Build While Bleeding",
+  "description": "Interactive Claude/Gemini-powered code assistant REPL for Termux",
   "type": "module",
-  "main": "src/repl.js",
+  "main": "index.js",
   "bin": {
-    "bwb-assist": "./src/repl.js"
+    "bwb": "./index.js"
   },
   "scripts": {
-    "start": "node src/repl.js",
-    "start:path": "node src/repl.js"
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
+    "@google/genai": "latest",
+    "groq-sdk": "^1.2.1",
+    "sql.js": "^1.14.1"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": [
-    "termux",
-    "claude",
-    "code-assistant",
-    "ai",
-    "repl"
-  ],
-  "author": "RyanrealAF — buildwhilebleeding.com",
-  "license": "MIT",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.104.1",
-    "@google/generative-ai": "^0.24.1",
-    "commander": "^14.0.3",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "sqlite3": "^6.0.1"
-  }
+  "author": "RyanrealAF / Build While Bleeding",
+  "license": "MIT"
 }
