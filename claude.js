@@ -9,7 +9,23 @@ const MAX_TOKENS = 4096;
 const API_HOST = "api.anthropic.com";
 const API_PATH = "/v1/messages";
 const API_VERSION = "2023-06-01";
+const MAX_PROMPT_TOKENS = 6000;
 // ───────────────────────────────────────────────────────────────────────────
+
+function estimateTokens(text) {
+    // A rough estimate of token count
+    return Math.ceil(text.length / 4);
+}
+
+function trimPrompt(prompt) {
+    let tokens = estimateTokens(prompt);
+    if (tokens > MAX_PROMPT_TOKENS) {
+        const excessTokens = tokens - MAX_PROMPT_TOKENS;
+        const excessChars = excessTokens * 4;
+        return prompt.substring(excessChars);
+    }
+    return prompt;
+}
 
 function getApiKey() {
   const key = process.env.ANTHROPIC_API_KEY;
@@ -22,7 +38,7 @@ function getApiKey() {
 }
 
 function buildSystemPrompt(projectContext) {
-  return `You are a code assistant embedded in a developer's Termux environment on Android.
+  return `You are a code assistant embedded in a developer\'s Termux environment on Android.
 You have been given the full context of their project below.
 Answer questions about the code, suggest improvements, debug issues, write new code, and explain logic.
 Be precise and direct. Prefer complete, working code over partial snippets.
@@ -33,13 +49,14 @@ ${projectContext}`;
 }
 
 export async function chat(projectContext, history) {
+  const trimmedProjectContext = trimPrompt(projectContext);
   return new Promise((resolve, reject) => {
     const apiKey = getApiKey();
 
     const body = JSON.stringify({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: buildSystemPrompt(projectContext),
+      system: buildSystemPrompt(trimmedProjectContext),
       messages: history,
       stream: true,
     });
