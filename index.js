@@ -1,5 +1,4 @@
 import "dotenv/config";
-import Groq from "groq-sdk";
 import { handleMythCommand } from "./commands/myth.js";
 import { handoffToFirebase } from './src/firebase-bridge.js';
 import readline from "readline";
@@ -9,13 +8,13 @@ import os from "os";
 import { execSync, spawnSync } from "child_process";
 
 const CONFIG = {
-  model:              "llama-3.1-8b-instant",
+  model:              process.env.OLLAMA_MODEL || "llama3.1",
+  ollama_api_url:     process.env.OLLAMA_API_URL || "http://localhost:11434/api/chat",
   max_tokens:         4096,
   max_file_bytes:     80_000,
   max_history_turns:  6,
   auto_flush_turns:   10,
   context_dir:        process.cwd(),
-  groq_api_key:       process.env.GROQ_API_KEY || "REPLACE_WITH_YOUR_API_KEY",
   history_file:       path.join(os.homedir(), ".bwb_repl_history.json"),
   notes_file:         path.join(os.homedir(), ".bwb_notes.json"),
   cf_account_id:      process.env.CF_ACCOUNT_ID  || "REPLACE_WITH_ACCOUNT_ID",
@@ -196,18 +195,26 @@ function cfD1Exec(sql) {
 
 function esc(str) { return String(str || "").replace(/'/g, "''"); }
 
-async function evaluateSignal(client, lastUserMsg, lastAssistantMsg) {
+async function evaluateSignal(lastUserMsg, lastAssistantMsg) {
   try {
-    const resp = await client.chat.completions.create({
-      model: CONFIG.model, max_tokens: 300,
-      messages: [
-        { role: "system", content: SYSTEM_SIGNAL_EVAL },
-        { role: "user", content: `USER: ${lastUserMsg}\n\nASSISTANT: ${lastAssistantMsg}` }
-      ],
+    const response = await fetch(CONFIG.ollama_api_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: CONFIG.model,
+            stream: false,
+            messages: [
+                { role: "system", content: SYSTEM_SIGNAL_EVAL },
+                { role: "user", content: `USER: ${lastUserMsg}\n\nASSISTANT: ${lastAssistantMsg}` }
+            ]
+        })
     });
-    const raw = resp.choices[0]?.message?.content || "{}";
+    const data = await response.json();
+    const raw = data.message?.content || "{}";
     return JSON.parse(raw.replace(/```json|```/g, "").trim());
-  } catch (_) { return { has_signal: false, signal_type: "none", note: "", tags: [] }; }
+  } catch (_) {
+    return { has_signal: false, signal_type: "none", note: "", tags: [] };
+  }
 }
 
 async function flushToCloudflare(history, noteIds, label = "auto") {
@@ -482,14 +489,6 @@ function fsBatchLoad(dirPath, extensions, loadedFiles) {
 }
 
 async function main() {
-  const apiKey = CONFIG.groq_api_key;
-  if (!apiKey || apiKey === "REPLACE_WITH_YOUR_API_KEY") {
-    print(C.red, "Error: GROQ_API_KEY not set.");
-    print(C.gray, "Please add your GROQ_API_KEY to index.js or set it as an environment variable.");
-    process.exit(1);
-  }
-
-  const client = new Groq({ apiKey });
   let history = loadHistory();
   let loadedFiles = {};
   let sessionNoteIds = [];
@@ -500,7 +499,7 @@ async function main() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
 
   print(C.bold + C.cyan, "\n╔══ BWB Code Assistant ═════════════════════╗");
-  print(C.cyan,           "║  Claude · Python · Cloudflare Memory REPL  ║");
+  print(C.cyan,           "║     Ollama · Python · Cloudflare REPL      ║");
   print(C.cyan,           "╚═════════════════════════════════════════════╝");
   print(C.gray, `Model: ${CONFIG.model}  |  Project: ${CONFIG.project_name}`);
   print(C.gray, `History: ${Math.floor(history.length/2)} turns  |  Notes: ${loadNotes().length} stored`);
@@ -535,19 +534,35 @@ async function main() {
     process.stdout.write(C.green + "\nAssistant: " + C.reset);
     let fullResponse = "";
     try {
-      const stream = await client.chat.completions.create({
-        model: CONFIG.model,
-        max_tokens: CONFIG.max_tokens,
-        messages: [{ role: "system", content: SYSTEM_MAIN }, ...history],
-        stream: true,
-      });
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content || "";
-        process.stdout.write(text);
-        fullResponse += text;
-      }
+        const response = await fetch(CONFIG.ollama_api_url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: CONFIG.model,
+                stream: true,
+                messages: [{ role: "system", content: SYSTEM_MAIN }, ...history]
+            })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            // Ollama streams NDJSON, so we need to parse each line
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            for (const line of lines) {
+                const parsed = JSON.parse(line);
+                const text = parsed.message?.content || "";
+                process.stdout.write(text);
+                fullResponse += text;
+            }
+        }
+
     } catch (err) {
-      print(C.red, `\nAPI Error: ${err.message}`);
+      print(C.red, `\nAPI Error: ${err.message}`)
       history.pop(); return;
     }
 
@@ -555,7 +570,7 @@ async function main() {
     history.push({ role: "assistant", content: fullResponse });
     saveHistory(history);
 
-    const signal = await evaluateSignal(client, userInput, fullResponse);
+    const signal = await evaluateSignal(userInput, fullResponse);
     if (signal.has_signal) {
       const noteId = `note_${Date.now()}`;
       const noteObj = {
