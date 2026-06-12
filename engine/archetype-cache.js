@@ -1,5 +1,6 @@
-const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./data/archetypes.db');
+import sqlite3 from 'sqlite3';
+
+const db = new (sqlite3.verbose()).Database('./data/archetypes.db');
 
 class ArchetypeCache {
   constructor() {
@@ -46,7 +47,8 @@ class ArchetypeCache {
 
         if (row) {
           const newCount = row.count + 1;
-          const newMutations = `${row.mutations}\n${mutation}`;
+          const newMutations = `${row.mutations}\
+${mutation}`;
           db.run(
             'UPDATE archetypes SET count = ?, mutations = ?, lastSeen = ? WHERE name = ?',
             [newCount, newMutations, new Date().toISOString(), name],
@@ -85,4 +87,4 @@ class ArchetypeCache {
   }
 }
 
-module.exports = ArchetypeCache;
+export default ArchetypeCache;

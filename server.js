@@ -1,7 +1,7 @@
-const express = require('express');
-const cors = require('cors');
-const { exec } = require('child_process');
-const ArchetypeCache = require('./engine/archetype-cache');
+import express from 'express';
+import cors from 'cors';
+import { exec } from 'child_process';
+import ArchetypeCache from './engine/archetype-cache.js';
 
 const app = express();
 const port = 3000;
