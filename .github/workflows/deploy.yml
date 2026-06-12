@@ -21,8 +21,13 @@ jobs:
       - name: Install dependencies
         run: cd studio && npm install
 
+      - name: Build
+        run: cd studio && npm run build
+
       - name: Deploy to Cloudflare Pages
-        run: cd studio && npm run deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: 'bwb-studio'
+          directory: 'studio/dist'
