@@ -1,47 +1,32 @@
-# To learn more about how to use Nix to configure your environment
-# see: https://firebase.google.com/docs/studio/customize-workspace
-{ pkgs, ... }: {
+{ pkgs, ... }:
+{
   # Which nixpkgs channel to use.
-  channel = "stable-24.05"; # or "unstable"
-
-  # Use https://search.nixos.org/packages to find packages
+  channel = "stable-23.11"; # Or "unstable"
+  # Use https://search.nixos.org/packages to find packages.
   packages = [
     pkgs.nodejs_20
+    pkgs.nodePackages.npm
   ];
-
-  # Sets environment variables in the workspace
+  # Sets environment variables in the workspace.
   env = {};
-  idx = {
-    # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
-    extensions = [
-      # "vscodevim.vim"
-    ];
-
-    # Enable previews
-    previews = {
-      enable = true;
-      previews = {
-        web = {
-          command = ["node" "server.js"];
-          manager = "web";
-          env = {
-            PORT = "$PORT";
-          };
-        };
-      };
+  # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id" for the ID.
+  extensions = [];
+  # Enable previews and customize configuration
+  previews = {
+    enable = true;
+    server = {
+      # The command to run the web server. This is required.
+      command = "npm run preview";
+      # The port that the web server will listen on. Default is 3000.
+      port = 3000;
+      # The directory to serve static files from. This is optional.
+      publicDir = "./";
     };
+  };
 
-    # Workspace lifecycle hooks
-    workspace = {
-      # Runs when a workspace is first created
-      onCreate = {
-        npm-install = "npm install";
-      };
-      # Runs when the workspace is (re)started
-      onStart = {
-        # Example: start a background task to watch and re-build backend code
-        start-server = "node server.js";
-      };
-    };
+  # What to run when your workspace starts up. It's recommended to start your custom web server here.
+  start = {
+    # The command to run when the workspace starts.
+    command = "npm install && npm start";
   };
 }
