@@ -8,8 +8,7 @@
     "bwb": "./index.js"
   },
   "scripts": {
-    "start": "node index.js",
-    "preview": "node preview_server.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",

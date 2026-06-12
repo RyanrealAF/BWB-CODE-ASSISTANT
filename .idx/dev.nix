@@ -16,7 +16,7 @@
     enable = true;
     server = {
       # The command to run the web server. This is required.
-      command = "npm run preview";
+      command = "npm start";
       # The port that the web server will listen on. Default is 3000.
       port = 3000;
       # The directory to serve static files from. This is optional.
@@ -27,6 +27,6 @@
   # What to run when your workspace starts up. It's recommended to start your custom web server here.
   start = {
     # The command to run when the workspace starts.
-    command = "npm install && npm start";
+    command = "npm install && node index.js";
   };
 }
