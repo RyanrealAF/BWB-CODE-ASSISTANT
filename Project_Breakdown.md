@@ -6,7 +6,7 @@ This project is an interactive, context-aware code assistant that runs in a REPL
 
 The system includes an integrated **Urban Myth Engine**, a creative text generation tool that can be used to generate stories and other creative content.
 
-The architecture is designed to be persistent and extensible, with features for file system interaction, Python script execution, and long-term memory persistence via Cloudflare Workers KV and D1.
+The architecture is designed to be persistent and extensible, with features for file system interaction, Python script execution, and long-term memory persistence via Cloudflare Workers KV and D1. It also includes a session handoff feature using Firebase Realtime Database.
 
 ## 2. Core Architecture
 
@@ -18,7 +18,19 @@ The architecture is designed to be persistent and extensible, with features for 
     *   **Distortion Model (llama-3.1-70b-versatile):** Used to inject surreal, unexpected details into the narrative.
 *   **Long-Term Memory:** The assistant uses Cloudflare Workers KV and D1 for long-term memory persistence, allowing it to retain context across sessions.
 
-## 3. Commands
+## 3. Firebase Handoff
+
+The project includes a mechanism to "handoff" the current REPL session to a Firebase Realtime Database. This allows a separate web-based UI (like a Firebase Studio dashboard) to pick up the session state and visualize it. This is designed as a temporary relay for live session transfer, not for primary, long-term storage, which is handled by Cloudflare D1.
+
+*   **`src/firebase-bridge.js`**: This module handles the connection and data transfer to a configured Firebase project.
+*   **`:handoff` command**: This REPL command serializes the current session's history, loaded file context, and other metadata into a snapshot and pushes it to the `sessions/current-session` node in the Realtime Database.
+
+### Handoff Protocol
+
+*   **State Serialization**: The `:handoff` command creates a snapshot of the `history` array and a list of keys from the `loadedFiles` object.
+*   **Studio Connection**: A web UI can listen for value changes (`onValue()`) on the `sessions/current-session` path in the Realtime Database to automatically load and display the REPL state.
+
+## 4. Commands
 
 The REPL includes a rich set of commands:
 
@@ -38,6 +50,7 @@ The REPL includes a rich set of commands:
 *   `:dir [path]`: Change the working directory.
 *   `:pwd`: Print the working directory.
 *   `:project [name]`: Show or set the project name.
+*   `:handoff`: Synchronize the current session to Firebase for external viewing.
 *   `:exit` / `:quit`: Exit the REPL.
 
 ### File System Commands (`:fs`)
@@ -56,17 +69,18 @@ The REPL includes a rich set of commands:
 *   `:myth history <name>`: View the mutation history of an archetype.
 *   `:myth reset`: Erase the archetype database.
 
-## 4. Deployment and Environment
+## 5. Deployment and Environment
 
 *   **Runtime:** Android Termux + Node.js
 *   **Nix Environment:** The project uses a `dev.nix` file to define the development environment, including the Node.js version and other packages.
 
-## 5. Dependencies
+## 6. Dependencies
 
 The project uses the following dependencies:
 
 *   `@anthropic-ai/sdk`
 *   `@google/genai`
 *   `dotenv`
+*   `firebase`
 *   `groq-sdk`
 *   `sql.js`
