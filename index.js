@@ -17,7 +17,7 @@ const CONFIG = {
   max_history_turns:  6,
   auto_flush_turns:   10,
   context_dir:        process.cwd(),
-  groq_api_key:       process.env.05TG0XFtCTaSNu8cWryuWGdyb3FYfhjV25IZ3KXr8TDMEuAAtc3O || "REPLACE_WITH_YOUR_API_KEY",
+  groq_api_key:       process.env.GROQ_API_KEY || "REPLACE_WITH_YOUR_API_KEY",
   history_file:       path.join(os.homedir(), ".bwb_repl_history.json"),
   notes_file:         path.join(os.homedir(), ".bwb_notes.json"),
   cf_account_id:      process.env.CF_ACCOUNT_ID  || "REPLACE_WITH_ACCOUNT_ID",
