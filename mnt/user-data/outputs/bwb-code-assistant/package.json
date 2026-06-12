@@ -1,0 +1,21 @@
+{
+  "name": "bwb-code-assistant",
+  "version": "1.0.0",
+  "description": "Interactive Claude-powered code assistant for Termux — Build While Bleeding",
+  "type": "module",
+  "main": "src/repl.js",
+  "bin": {
+    "bwb-assist": "./src/repl.js"
+  },
+  "scripts": {
+    "start": "node src/repl.js",
+    "start:path": "node src/repl.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["termux", "claude", "code-assistant", "ai", "repl"],
+  "author": "RyanrealAF — buildwhilebleeding.com",
+  "license": "MIT",
+  "dependencies": {}
+}
