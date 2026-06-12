@@ -16,7 +16,7 @@
     enable = true;
     server = {
       # The command to run the web server. This is required.
-      command = "npm start";
+      command = "npm run preview";
       # The port that the web server will listen on. Default is 3000.
       port = 3000;
       # The directory to serve static files from. This is optional.
