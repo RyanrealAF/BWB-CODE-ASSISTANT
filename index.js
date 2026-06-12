@@ -1,7 +1,4 @@
-#!/usr/bin/env node
-// ENTRY POINT: bwb-code-assistant/index.js
-// Interactive REPL — Claude API, streaming, Python execution, Cloudflare memory
-
+import "dotenv/config";
 import Groq from "groq-sdk";
 import { handleMythCommand } from "./commands/myth.js";
 import readline from "readline";
