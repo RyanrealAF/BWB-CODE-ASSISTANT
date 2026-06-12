@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { handleMythCommand } from "./commands/myth.js";
-import { handoffToFirebase } from './src/firebase-bridge.js';
 import readline from "readline";
 import fs from "fs";
 import path from "path";
@@ -611,7 +610,7 @@ async function main() {
 
     switch (cmd) {
       case ":help":
-        print(C.cyan, `Commands:\n  :load <file>          Inject file into context\n  :scan [dir] [.ext]    List files (e.g. :scan src .js .py)\n  :context              Show loaded files\n  :clear                Drop file context, keep history\n  :reset                Wipe files + history (local)\n  :save [file]          Save last code block (no arg = CF flush)\n  :run <file.py>        Execute Python, inject output into next message\n  :write <file> [lang]  Extract last code block and write to file\n  :notes [tag]          Show memory notes (optional tag filter)\n  :flush                Manual flush to Cloudflare\n  :dir [path]           Change working directory\n  :pwd                  Print working directory\n  :project [name]       Show or set project name\n  :handoff              Handoff session to Firebase Studio\n  :exit / :quit         Exit`);
+        print(C.cyan, `Commands:\n  :load <file>          Inject file into context\n  :scan [dir] [.ext]    List files (e.g. :scan src .js .py)\n  :context              Show loaded files\n  :clear                Drop file context, keep history\n  :reset                Wipe files + history (local)\n  :save [file]          Save last code block (no arg = CF flush)\n  :run <file.py>        Execute Python, inject output into next message\n  :write <file> [lang]  Extract last code block and write to file\n  :notes [tag]          Show memory notes (optional tag filter)\n  :flush                Manual flush to Cloudflare\n  :dir [path]           Change working directory\n  :pwd                  Print working directory\n  :project [name]       Show or set project name\n  :exit / :quit         Exit`);
         break;
       case ":pwd": print(C.cyan, CONFIG.context_dir); break;
       case ":dir": {
@@ -688,24 +687,6 @@ async function main() {
         const r = await flushToCloudflare(history, sessionNoteIds, "manual");
         print(C.gray, `Flushed ${r.id} | D1:${r.d1} KV:${r.kv}`);
         history = []; sessionNoteIds = []; saveHistory(history); break;
-      }
-      case ":handoff": {
-        print(C.gray, "Creating session snapshot...");
-        const sessionSnapshot = {
-            history: history,
-            context: Object.keys(loadedFiles),
-            model: CONFIG.model,
-            project: CONFIG.project_name,
-            cwd: CONFIG.context_dir
-        };
-        print(C.gray, "Attempting handoff to Firebase Realtime Database...");
-        const success = await handoffToFirebase('current-session', sessionSnapshot);
-        if (success) {
-            print(C.green, 'Handoff successful. Firebase Studio can now pick up `sessions/current-session`.');
-        } else {
-            print(C.red, 'Handoff failed. Check Firebase config in `src/firebase-bridge.js` and network connection.');
-        }
-        break;
       }
       case ":exit": case ":quit":
         print(C.gray, "Exiting."); rl.close(); process.exit(0);
@@ -801,7 +782,7 @@ async function main() {
         }
         break;
       }
-      case ":myth": await handleMythCommand(parts, print); break;
+      case ":myth": await handleMythCommand(parts, print, CONFIG); break;
       default: print(C.yellow, `Unknown command: ${cmd}. Type :help`);
     }
   }

@@ -1,23 +1,43 @@
-import Groq from "groq-sdk";
+
 import { buildSafePayload, compressArchetypeContext } from "./token-router.js";
 import { initDB, upsertArchetype, listArchetypes, getArchetypeHistory, resetDB } from "./archetype-cache.js";
-
-const NARRATIVE_MODEL  = "llama-3.1-8b-instant";
-const DISTORTION_MODEL = "llama-3.3-70b-versatile";
 
 const SYS_NARRATIVE  = "Urban myth engine. Input: seed. Output: 100-word street-level myth, second person present tense, end mid-thought. No fantasy. No heroes.";
 const SYS_DISTORTION = "Input: myth. Output: same myth with one impossible-but-inevitable detail injected. No explanation. No resolution. 100 words max.";
 const SYS_ARCHETYPE  = "Input: myth. Output: JSON array only, 1-3 archetype names. Example: [\"The Corner\",\"The Signal\"]";
 
 export class UrbanMythEngine {
-  constructor(apiKey) {
-    this.groq  = new Groq({ apiKey });
+  constructor(apiUrl, model) {
+    this.apiUrl = apiUrl;
+    this.model = model;
     this.ready = false;
   }
 
   async init() {
     await initDB();
     this.ready = true;
+  }
+
+  async _ollamaCall(systemPrompt, userMessages, maxTokens) {
+    const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: this.model,
+            stream: false,
+            max_tokens: maxTokens,
+            messages: [
+                { role: "system", content: systemPrompt },
+                ...userMessages
+            ]
+        })
+    });
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Ollama API call failed with status ${response.status}: ${errorBody}`);
+    }
+    const data = await response.json();
+    return data.message?.content || "";
   }
 
   async generate(seed) {
@@ -28,35 +48,30 @@ export class UrbanMythEngine {
     const seedLine   = archCtx ? archCtx + "\nSeed: " + seed : "Seed: " + seed;
 
     const narrativeMessages = buildSafePayload(SYS_NARRATIVE, [{ role: "user", content: seedLine }], archCtx);
-    const narrativeResp = await this.groq.chat.completions.create({
-      model: NARRATIVE_MODEL, max_tokens: 200,
-      messages: [{ role: "system", content: SYS_NARRATIVE }, ...narrativeMessages],
-    });
-    const narrative = narrativeResp.choices[0]?.message?.content || "";
+    const narrative = await this._ollamaCall(SYS_NARRATIVE, narrativeMessages, 200);
+    if (!narrative) throw new Error("Narrative generation failed (empty response).");
+
 
     const distortionMessages = buildSafePayload(SYS_DISTORTION, [{ role: "user", content: narrative }]);
-    const distortionResp = await this.groq.chat.completions.create({
-      model: DISTORTION_MODEL, max_tokens: 200,
-      messages: [{ role: "system", content: SYS_DISTORTION }, ...distortionMessages],
-    });
-    const distorted = distortionResp.choices[0]?.message?.content || "";
+    const distorted = await this._ollamaCall(SYS_DISTORTION, distortionMessages, 200);
+    if (!distorted) throw new Error("Distortion generation failed (empty response).");
 
-    const archetypeResp = await this.groq.chat.completions.create({
-      model: NARRATIVE_MODEL, max_tokens: 60,
-      messages: [
-        { role: "system", content: SYS_ARCHETYPE },
-        { role: "user",   content: distorted },
-      ],
-    });
+    const archetypeMessages = [{ role: "user", content: distorted }];
+    const rawArchetypes = await this._ollamaCall(SYS_ARCHETYPE, archetypeMessages, 60);
 
     let extractedArchetypes = [];
     try {
-      const raw = archetypeResp.choices[0]?.message?.content || "[]";
-      extractedArchetypes = JSON.parse(raw.replace(/```json|```/g, "").trim());
-    } catch (_) {}
+      if (rawArchetypes) {
+        extractedArchetypes = JSON.parse(rawArchetypes.replace(/```json|```/g, "").trim());
+      }
+    } catch (err) {
+      console.error("Failed to parse archetypes:", rawArchetypes, err.message);
+    }
 
-    for (const name of extractedArchetypes) {
-      upsertArchetype(name, distorted.slice(0, 50));
+    if (Array.isArray(extractedArchetypes)) {
+        for (const name of extractedArchetypes) {
+          upsertArchetype(name, distorted.slice(0, 50));
+        }
     }
 
     return { seed, narrative, distorted, archetypes: extractedArchetypes };

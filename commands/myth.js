@@ -16,11 +16,9 @@ const print = (color, ...args) => console.log(color + args.join(" ") + C.reset);
 
 let engine = null;
 
-async function getEngine() {
+async function getEngine(config) {
   if (!engine) {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) { print(C.red, "GROQ_API_KEY not set."); process.exit(1); }
-    engine = new UrbanMythEngine(apiKey);
+    engine = new UrbanMythEngine(config.ollama_api_url, config.model);
     await engine.init();
   }
   return engine;
@@ -66,9 +64,9 @@ function generateMythHTML(result) {
   `;
 }
 
-export async function handleMythCommand(parts, print) {
+export async function handleMythCommand(parts, print, config) {
   const subcmd = parts[1];
-  const eng    = await getEngine();
+  const eng    = await getEngine(config);
 
   if (!subcmd || subcmd === "help") {
     print(C.cyan, `Myth Engine commands:
