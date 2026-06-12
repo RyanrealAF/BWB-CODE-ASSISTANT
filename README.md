@@ -1,87 +1,25 @@
 # BWB Code Assistant
 
-Interactive Claude-powered code assistant REPL for Termux.
-Persistent chat session with codebase file injection and streaming output.
+**Build While Bleeding — A versatile and powerful code assistant REPL**
 
----
+This project is an interactive code assistant that runs in a REPL (Read-Eval-Print Loop) environment. It's designed to be a powerful and flexible tool for developers, providing assistance with a wide range of coding tasks.
 
-## Install
+## Key Features
 
-```bash
-# 1. Install Node (if not already)
-pkg install nodejs
+*   **Interactive REPL:** The assistant is accessed through a command-line REPL, allowing for a conversational and interactive coding experience.
+*   **Multi-Modal AI Support:** The assistant can be configured to use different AI models, including:
+    *   **Claude:** For powerful and creative code generation.
+    *   **Gemini:** For fast and efficient code completion and suggestions.
+    *   **Groq:** For high-performance and low-latency responses.
+*   **Job-Based Architecture:** The project is evolving to support a job-based architecture using Firebase and Ollama. This will allow for offline or on-device processing of AI tasks, making the assistant more resilient and versatile.
+*   **Extensible Command System:** The REPL includes a command system that can be extended with new features and integrations.
 
-# 2. Install dependencies
-cd bwb-code-assistant
-npm install
+## Getting Started
 
-# 3. Set your API key (add to ~/.bashrc to persist across sessions)
-export ANTHROPIC_API_KEY=your_key_here
-
-# 4. Make executable and link globally (optional)
-chmod +x index.js
-npm link
-```
-
----
-
-## Run
-
-```bash
-node index.js
-# or if npm linked:
-bwb
-```
-
----
+1.  **Install Dependencies:** Run `npm install` to install the required dependencies.
+2.  **Configure API Keys:** Create a `.env` file and add your API keys for the AI models you want to use.
+3.  **Run the Assistant:** Run `npm start` to start the REPL.
 
 ## Commands
 
-| Command | Action |
-|---|---|
-| `:load <file>` | Inject file into context |
-| `:scan [dir] [.ext]` | List files (e.g. `:scan src .js .ts`) |
-| `:context` | Show loaded files |
-| `:clear` | Drop file context, keep history |
-| `:reset` | Wipe files + history |
-| `:dir [path]` | Change working directory |
-| `:pwd` | Print working directory |
-| `:save` | Force-save history |
-| `:exit` | Quit |
-| `:help` | Command list |
-
----
-
-## Example session
-
-```
-You: :scan . .js
-You: :load src/worker.js
-You: :load wrangler.toml
-You: KV write is silently failing on second request — why?
-```
-
-File contents + question go into a single context window.
-Responses stream token-by-token to stdout.
-History persists at ~/.bwb_repl_history.json between sessions.
-
----
-
-## Config (index.js top)
-
-```js
-const CONFIG = {
-  model: "claude-sonnet-4-6",
-  max_tokens: 4096,
-  max_file_bytes: 80_000,
-  max_history_turns: 20,
-};
-```
-
----
-
-## Notes
-
-- Requires Node 18+ (`pkg install nodejs` in Termux)
-- Files are injected per-message only — nothing stored externally
-- Use `:reset` when switching projects to prevent context bleed
+The REPL includes a set of commands for interacting with the assistant and the project. Type `:help` in the REPL to see a list of available commands.

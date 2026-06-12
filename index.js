@@ -1,6 +1,7 @@
 import "dotenv/config";
 import Groq from "groq-sdk";
 import { handleMythCommand } from "./commands/myth.js";
+import { createJob, listenForPendingJobs, updateJob } from "./firebase-service.js";
 import readline from "readline";
 import fs from "fs";
 import path from "path";
@@ -602,6 +603,7 @@ async function main() {
   :dir [path]           Change working directory
   :pwd                  Print working directory
   :project [name]       Show or set project name
+  :firebase <cmd>       Interact with Firebase (e.g. create, listen)
   :exit / :quit         Exit`);
         break;
       case ":pwd": print(C.cyan, CONFIG.context_dir); break;
@@ -680,6 +682,61 @@ async function main() {
         print(C.gray, `Flushed ${r.id} | D1:${r.d1} KV:${r.kv}`);
         history = []; sessionNoteIds = []; saveHistory(history); break;
       }
+      case ":firebase": {
+        const subcmd = parts[1];
+        const fbarg1 = parts.slice(2).join(" ");
+
+        switch (subcmd) {
+          case "create":
+            if (!fbarg1) { print(C.yellow, "Usage: :firebase create <prompt>"); break; }
+            print(C.gray, `Creating Firebase job with prompt: "${fbarg1}"`);
+            const jobId = await createJob(fbarg1);
+            if (jobId) {
+              print(C.green, `Job created with ID: ${jobId}`);
+            } else {
+              print(C.red, "Failed to create job. Check your Firebase config and network.");
+            }
+            break;
+          case "listen":
+            print(C.cyan, "Listening for pending jobs... New pending jobs will be processed.");
+            listenForPendingJobs(async (job) => {
+                print(C.magenta, `[FIREBASE] Picked up job: ${job.id}`);
+                await updateJob(job.id, { status: 'processing' });
+                print(C.gray, `[FIREBASE] Processing job: ${job.id} - "${job.prompt}"`);
+
+                try {
+                    const ollamaRes = await fetch("http://localhost:11434/api/generate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            model: "qwen3:2b",
+                            prompt: job.prompt,
+                            stream: false
+                        })
+                    });
+
+                    if (!ollamaRes.ok) {
+                        const errorText = await ollamaRes.text();
+                        throw new Error(`Ollama API returned status ${ollamaRes.status}: ${errorText}`);
+                    }
+
+                    const ollamaData = await ollamaRes.json();
+                    const result = ollamaData.response;
+
+                    await updateJob(job.id, { result: result, status: 'done' });
+                    print(C.green, `[FIREBASE] Job ${job.id} complete.`);
+
+                } catch (e) {
+                    print(C.red, `[FIREBASE] Error processing job ${job.id}: ${e.message}`);
+                    await updateJob(job.id, { status: 'failed', result: e.message });
+                }
+            });
+            break;
+          default:
+            print(C.cyan, `Firebase commands:\n  :firebase create <prompt>    Create a new AI job in Firestore.\n  :firebase listen               Listen for and process pending jobs.`);
+        }
+        break;
+      }
       case ":exit": case ":quit":
         print(C.gray, "Exiting."); rl.close(); process.exit(0);
 
@@ -728,13 +785,7 @@ async function main() {
           print(C.cyan, `${path.resolve(CONFIG.context_dir, fsarg1 || ".")}`);
           console.log(tree);
         } else {
-          print(C.cyan, `File System commands:
-  :fs read <file>                    Read file with line numbers
-  :fs write <file>                   Write last code block to file
-  :fs edit <file> <old>|||<new>      Surgical string replace in file
-  :fs diff <file>                    Diff current file vs loaded version
-  :fs batch <dir> [.ext .ext]        Load all matching files in dir
-  :fs tree [dir]                     Visual directory tree`);
+          print(C.cyan, `File System commands:\n  :fs read <file>                    Read file with line numbers\n  :fs write <file>                   Write last code block to file\n  :fs edit <file> <old>|||<new>      Surgical string replace in file\n  :fs diff <file>                    Diff current file vs loaded version\n  :fs batch <dir> [.ext .ext]        Load all matching files in dir\n  :fs tree [dir]                     Visual directory tree`);
         }
         break;
       }
@@ -776,11 +827,7 @@ async function main() {
           if (sha) print(C.green, `Pushed. Commit: ${sha.slice(0,7)}`);
           else print(C.red, "Push failed. Check repo name and token scope.");
         } else {
-          print(C.yellow, `Usage:
-  :gh repos                          List all your repos
-  :gh ls <repo> [path]               List files in repo
-  :gh pull <repo> <file>             Pull file into context
-  :gh push <repo> <file> [message]   Push local file to repo`);
+          print(C.yellow, `Usage:\n  :gh repos                          List all your repos\n  :gh ls <repo> [path]               List files in repo\n  :gh pull <repo> <file>             Pull file into context\n  :gh push <repo> <file> [message]   Push local file to repo`);
         }
         break;
       }
