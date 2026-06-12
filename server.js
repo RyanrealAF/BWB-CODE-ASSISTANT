@@ -28,7 +28,7 @@ app.post('/chat', async (req, res) => {
       res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
     }
     
-hn    history.push({ role: 'assistant', content: fullResponse });
+    history.push({ role: 'assistant', content: fullResponse });
     res.end();
 
   } catch (error) {
