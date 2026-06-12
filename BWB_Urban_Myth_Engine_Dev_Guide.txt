@@ -1,48 +1,53 @@
-﻿BWB Urban Myth Engine – Development Guide
-Overview
-This document defines the architecture and implementation plan for a CLI-based Urban Myth Engine built for Termux + Node.js environments. The system uses dual-model inference (Claude + Gemini), a persistent SQLite archetype cache, and a token-aware request router to ensure stability under API constraints.
-Core Architecture
-Pipeline: Seed → Claude Narrative → Gemini Distortion → Fusion Output
-Additional layers: Archetype Cache (SQLite persistence), Token Router (request safety), CLI Command Layer (BWB).
-Project Structure
-bwb-code-assistant/
-- index.js (CLI entry)
-- commands/myth.js (command handler)
-- engine/urban-myth-engine.js
-- engine/archetype-cache.js
-- engine/token-router.js
-- data/archetypes.db
-CLI Commands
-bwb myth "seed" → Generate myth
-bwb myth archetypes → List archetypes
-bwb myth history <name> → View archetype memory
-bwb myth reset → Clear database
-Urban Myth Engine
-Dual-inference system:
-- Claude: narrative coherence, structure, grounded storytelling
-- Gemini: controlled distortion, symbolic anomalies
-- Fusion layer: preserves contradiction without resolution
-Archetype Cache (SQLite)
-Persistent memory system storing archetype evolution:
-- name (primary key)
-- count (usage frequency)
-- mutations (recent distortion history)
-- lastSeen (timestamp)
+BWB Code Assistant & Urban Myth Engine – Development Guide
 
-Purpose: enables myth continuity and evolving narrative pressure across sessions.
-Token-Aware Request Router
-Prevents API overload (TPM limits) by:
-- Estimating token usage before requests
-- Trimming oversized prompts automatically
-- Compressing archetype memory into state packets
-- Falling back to secondary model if primary fails
-- Enforcing 6000 TPM safety ceiling with margin buffer
-System Behavior Model
-The system behaves as a controlled narrative generator with persistent memory. Repeated seeds evolve over time due to archetype mutation tracking, creating emergent mythology patterns.
+Overview
+This document defines the architecture for the BWB Code Assistant, an interactive REPL designed for a Termux + Node.js environment. The system functions as a persistent, context-aware coding assistant with an integrated Urban Myth Engine.
+
+The assistant leverages the Groq API for fast inference, using Llama 3.1 models for its core logic and creative generation. It includes features for file system interaction, Python script execution, and long-term memory persistence via Cloudflare Workers KV and D1.
+
+Core Architecture
+- REPL Interface: The primary user interface is a command-line REPL, providing a conversational loop for coding assistance.
+- File System Context: Users can load files into the assistant's context, allowing it to reason about and modify the current codebase.
+- Python Execution: The assistant can execute Python scripts and receive the output, enabling runtime validation and tool use.
+- Persistent Memory: Session history and important learned information ("signals") are persisted to Cloudflare, providing long-term context.
+- Urban Myth Engine: A specialized command within the REPL that generates creative text using a dual-model pipeline (Narrative + Distortion).
+
+Project Structure
+- index.js: Main entry point for the REPL application.
+- commands/myth.js: Command handler for the `:myth` functionality.
+- engine/urban-myth-engine.js: Core logic for the Urban Myth Engine.
+- engine/archetype-cache.js: Manages the SQLite database for myth archetypes.
+- engine/token-router.js: Manages API payload size to prevent errors.
+- data/archetypes.db: SQLite database for persistent archetype data.
+
+REPL Commands
+The REPL provides a suite of commands for interaction. Type `:help` in the REPL for a full list.
+
+Key Commands:
+- `:load <file>`: Load a file's content into the conversation context.
+- `:run <file.py>`: Execute a Python script and inject its output.
+- `:write <file>`: Save the last generated code block to a file.
+- `:scan [dir]`: List files in the project.
+- `:fs <sub-command>`: Advanced file system operations (read, tree, diff).
+- `:clear`: Clear the current file context.
+- `:reset`: Reset the session history and file context.
+- `:exit` / `:quit`: Exit the REPL.
+
+Urban Myth Engine (:myth)
+The `:myth` command provides access to the creative text generation engine.
+- `:myth "seed"`: Generate a new myth from a seed phrase.
+- `:myth archetypes`: List all stored archetypes.
+- `:myth history <name>`: View the mutation history of an archetype.
+- `:myth reset`: Erase the archetype database.
+
+Inference Models (Groq API)
+- Narrative Model (llama-3.1-8b-instant): Used for generating the base narrative and for most code-related tasks.
+- Distortion Model (llama-3.1-70b-versatile): Used to inject surreal, unexpected details into the narrative.
+
 Deployment Environment
-Designed for Android Termux + Node.js runtime:
-- Acode used for editing
-- Termux used for execution
-- Git used for sync layer
-- SQLite used for persistent memory
-- CLI used as primary interface
+- Runtime: Android Termux + Node.js
+- Editor: Acode (or any text editor)
+- Sync: Git
+- Local Persistence: SQLite (for myth archetypes)
+- Cloud Persistence: Cloudflare D1 and KV (for session memory)
+- Interface: Termux Command Line (running `npm start`)
