@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node index.js",
-    "preview": "node server.js"
+    "studio": "cd studio && npm install && npm run dev"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",

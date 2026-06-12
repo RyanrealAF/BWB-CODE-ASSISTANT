@@ -1,8 +1,2 @@
-# Dependencies
-node_modules/
-
-# Data
-data/archetypes.db
-
-# Environment variables
-.env
+node_modules
+studio/node_modules

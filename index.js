@@ -9,6 +9,7 @@ import { execSync, spawnSync } from "child_process";
 
 const CONFIG = {
   model:              process.env.OLLAMA_MODEL || "llama3.1",
+  fallback_model:     process.env.OLLAMA_FALLBACK_MODEL || "gemma",
   ollama_api_url:     process.env.OLLAMA_API_URL || "http://localhost:11434/api/chat",
   max_tokens:         4096,
   max_file_bytes:     80_000,
@@ -23,39 +24,9 @@ const CONFIG = {
   project_name:       process.env.BWB_PROJECT     || path.basename(process.cwd()),
 };
 
-const SYSTEM_MAIN = `You are a precision code assistant embedded in a Termux development environment.
-You have access to the developer'''s codebase via file contents they share with you.
-Defaults:
-- Diagnose bugs with root cause analysis, not surface patches.
-- Write complete, runnable code — no truncation, no placeholders.
-- Flag architecture issues, not just syntax errors.
-- Use the project'''s existing stack and conventions.
-- Be direct. No preamble. No motivational filler.
-When given file content, treat it as authoritative current state of that file.
-When given MEMORY NOTES, treat them as established context from prior sessions.
-When given PYTHON OUTPUT, treat it as runtime ground truth.`;
+const SYSTEM_MAIN = `You are a precision code assistant embedded in a Termux development environment.\nYou have access to the developer\'s codebase via file contents they share with you.\nDefaults:\n- Diagnose bugs with root cause analysis, not surface patches.\n- Write complete, runnable code — no truncation, no placeholders.\n- Flag architecture issues, not just syntax errors.\n- Use the project\'s existing stack and conventions.\n- Be direct. No preamble. No motivational filler.\nWhen given file content, treat it as authoritative current state of that file.\nWhen given MEMORY NOTES, treat them as established context from prior sessions.\nWhen given PYTHON OUTPUT, treat it as runtime ground truth.`;
 
-const SYSTEM_SIGNAL_EVAL = `You are a memory classifier for a developer'''s code assistant session.
-Evaluate the assistant'''s last response and return JSON only — no preamble, no markdown fences.
-
-Return this exact shape:
-{
-  "has_signal": true | false,
-  "signal_type": "error" | "correction" | "decision" | "pattern" | "dead_end" | "none",
-  "note": "one sentence max — what was learned or resolved",
-  "tags": ["tag1", "tag2"],
-  "project": "project name if mentioned"
-}
-
-has_signal = true ONLY if the response contains one of:
-- An error diagnosed or resolved
-- A misunderstanding corrected
-- An architectural or design decision made
-- A pattern or approach established
-- A dead end or failed approach documented
-
-has_signal = false for routine Q&A, explanations, or code generation with no notable event.
-Tags should be lowercase, specific, hyphenated where needed.`;
+const SYSTEM_SIGNAL_EVAL = `You are a memory classifier for a developer\'s code assistant session.\nEvaluate the assistant\'s last response and return JSON only — no preamble, no markdown fences.\n\nReturn this exact shape:\n{\n  "has_signal": true | false,\n  "signal_type": "error" | "correction" | "decision" | "pattern" | "dead_end" | "none",\n  "note": "one sentence max — what was learned or resolved",\n  "tags": ["tag1", "tag2"],\n  "project": "project name if mentioned"\n}\n\nhas_signal = true ONLY if the response contains one of:\n- An error diagnosed or resolved\n- A misunderstanding corrected\n- An architectural or design decision made\n- A pattern or approach established\n- A dead end or failed approach documented\n\nhas_signal = false for routine Q&A, explanations, or code generation with no notable event.\nTags should be lowercase, specific, hyphenated where needed.`;
 
 const C = {
   reset:   "\x1b[0m",
@@ -168,18 +139,17 @@ function cfKvPut(key, value) {
 }
 
 function cfD1Init() {
-  const sql = `CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, project TEXT, timestamp TEXT, turns TEXT, note_ids TEXT);
-CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, project TEXT, timestamp TEXT, signal_type TEXT, note TEXT, tags TEXT);`;
+  const sql = `CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, project TEXT, timestamp TEXT, turns TEXT, note_ids TEXT);\nCREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, project TEXT, timestamp TEXT, signal_type TEXT, note TEXT, tags TEXT);`;
   return cfD1Exec(sql);
 }
 
 function cfD1InsertNote(note) {
-  const sql = `INSERT OR REPLACE INTO notes (id, project, timestamp, signal_type, note, tags) VALUES ('''${note.id}''', '''${esc(note.project)}''', '''${note.timestamp}''', '''${note.signal_type}''', '''${esc(note.note)}''', '''${esc(note.tags.join(","))}''');`;
+  const sql = `INSERT OR REPLACE INTO notes (id, project, timestamp, signal_type, note, tags) VALUES (\'\'\'${note.id}\'\'\', \'\'\'${esc(note.project)}\'\'\', \'\'\'${note.timestamp}\'\'\', \'\'\'${note.signal_type}\'\'\', \'\'\'${esc(note.note)}\'\'\', \'\'\'${esc(note.tags.join(","))}\'\'\');`;
   return cfD1Exec(sql);
 }
 
 function cfD1InsertConversation(convo) {
-  const sql = `INSERT OR REPLACE INTO conversations (id, project, timestamp, turns, note_ids) VALUES ('''${convo.id}''', '''${esc(convo.project)}''', '''${convo.timestamp}''', '''${esc(JSON.stringify(convo.turns))}''', '''${esc(convo.note_ids.join(","))}''');`;
+  const sql = `INSERT OR REPLACE INTO conversations (id, project, timestamp, turns, note_ids) VALUES (\'\'\'${convo.id}\'\'\', \'\'\'${esc(convo.project)}\'\'\', \'\'\'${convo.timestamp}\'\'\', \'\'\'${esc(JSON.stringify(convo.turns))}\'\'\', \'\'\'${esc(convo.note_ids.join(","))}\'\'\');`;
   return cfD1Exec(sql);
 }
 
@@ -196,12 +166,12 @@ function cfD1Exec(sql) {
 function esc(str) { return String(str || "").replace(/'/g, "''"); }
 
 async function evaluateSignal(lastUserMsg, lastAssistantMsg) {
-  try {
+  const doEval = async (model) => {
     const response = await fetch(CONFIG.ollama_api_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            model: CONFIG.model,
+            model: model,
             stream: false,
             messages: [
                 { role: "system", content: SYSTEM_SIGNAL_EVAL },
@@ -209,11 +179,23 @@ async function evaluateSignal(lastUserMsg, lastAssistantMsg) {
             ]
         })
     });
+    if (!response.ok) throw new Error(`Eval failed with status ${response.status}`);
     const data = await response.json();
     const raw = data.message?.content || "{}";
+    if (!raw || raw.trim() === '{}') return { has_signal: false, signal_type: "none", note: "Empty response from model", tags: ["eval-fail"] };
     return JSON.parse(raw.replace(/```json|```/g, "").trim());
-  } catch (_) {
-    return { has_signal: false, signal_type: "none", note: "", tags: [] };
+  }
+
+  try {
+    return await doEval(CONFIG.model);
+  } catch (err) {
+    print(C.yellow, `[signal] Primary model failed. Trying fallback...`);
+    try {
+        return await doEval(CONFIG.fallback_model);
+    } catch (fallbackErr) {
+        print(C.red, `[signal] Both models failed for signal evaluation.`);
+        return { has_signal: false, signal_type: "none", note: "", tags: [] };
+    }
   }
 }
 
@@ -335,12 +317,12 @@ async function cfD1InitRest() {
 }
 
 async function cfD1InsertNoteRest(note) {
-  const sql = `INSERT OR REPLACE INTO notes (id, project, timestamp, signal_type, note, tags) VALUES ('''${note.id}''', '''${esc(note.project)}''', '''${note.timestamp}''', '''${note.signal_type}''', '''${esc(note.note)}''', '''${esc(note.tags.join(","))}''');`;
+  const sql = `INSERT OR REPLACE INTO notes (id, project, timestamp, signal_type, note, tags) VALUES (\'\'\'${note.id}\'\'\', \'\'\'${esc(note.project)}\'\'\', \'\'\'${note.timestamp}\'\'\', \'\'\'${note.signal_type}\'\'\', \'\'\'${esc(note.note)}\'\'\', \'\'\'${esc(note.tags.join(","))}\'\'\');`;
   return cfD1ExecRest(sql);
 }
 
 async function cfD1InsertConversationRest(convo) {
-  const sql = `INSERT OR REPLACE INTO conversations (id, project, timestamp, turns, note_ids) VALUES ('''${convo.id}''', '''${esc(convo.project)}''', '''${convo.timestamp}''', '''${esc(JSON.stringify(convo.turns))}''', '''${esc(convo.note_ids.join(","))}''');`;
+  const sql = `INSERT OR REPLACE INTO conversations (id, project, timestamp, turns, note_ids) VALUES (\'\'\'${convo.id}\'\'\', \'\'\'${esc(convo.project)}\'\'\', \'\'\'${convo.timestamp}\'\'\', \'\'\'${esc(JSON.stringify(convo.turns))}\'\'\', \'\'\'${esc(convo.note_ids.join(","))}\'\'\');`;
   return cfD1ExecRest(sql);
 }
 
@@ -403,12 +385,12 @@ async function mcpD1Init() {
 }
 
 async function mcpD1InsertNote(note) {
-  const sql = `INSERT OR REPLACE INTO notes (id, project, timestamp, signal_type, note, tags) VALUES ('''${note.id}''', '''${esc(note.project)}''', '''${note.timestamp}''', '''${note.signal_type}''', '''${esc(note.note)}''', '''${esc(note.tags.join(","))}''');`;
+  const sql = `INSERT OR REPLACE INTO notes (id, project, timestamp, signal_type, note, tags) VALUES (\'\'\'${note.id}\'\'\', \'\'\'${esc(note.project)}\'\'\', \'\'\'${note.timestamp}\'\'\', \'\'\'${note.signal_type}\'\'\', \'\'\'${esc(note.note)}\'\'\', \'\'\'${esc(note.tags.join(","))}\'\'\');`;
   return mcpD1Exec(sql);
 }
 
 async function mcpD1InsertConversation(convo) {
-  const sql = `INSERT OR REPLACE INTO conversations (id, project, timestamp, turns, note_ids) VALUES ('''${convo.id}''', '''${esc(convo.project)}''', '''${convo.timestamp}''', '''${esc(JSON.stringify(convo.turns))}''', '''${esc(convo.note_ids.join(","))}''');`;
+  const sql = `INSERT OR REPLACE INTO conversations (id, project, timestamp, turns, note_ids) VALUES (\'\'\'${convo.id}\'\'\', \'\'\'${esc(convo.project)}\'\'\', \'\'\'${convo.timestamp}\'\'\', \'\'\'${esc(JSON.stringify(convo.turns))}\'\'\', \'\'\'${esc(convo.note_ids.join(","))}\'\'\');`;
   return mcpD1Exec(sql);
 }
 
@@ -533,8 +515,11 @@ async function main() {
 
     process.stdout.write(C.green + "\nAssistant: " + C.reset);
     let fullResponse = "";
+    let response;
+    let modelUsed = CONFIG.model;
+
     try {
-        const response = await fetch(CONFIG.ollama_api_url, {
+        response = await fetch(CONFIG.ollama_api_url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -543,7 +528,29 @@ async function main() {
                 messages: [{ role: "system", content: SYSTEM_MAIN }, ...history]
             })
         });
+        if (!response.ok) throw new Error(`Primary model failed with status ${response.status}`);
+    } catch (err) {
+        print(C.yellow, `\nPrimary model ('${CONFIG.model}') failed. Trying fallback ('${CONFIG.fallback_model}')...`);
+        modelUsed = CONFIG.fallback_model;
+        try {
+            response = await fetch(CONFIG.ollama_api_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: CONFIG.fallback_model,
+                    stream: true,
+                    messages: [{ role: "system", content: SYSTEM_MAIN }, ...history]
+                })
+            });
+            if (!response.ok) throw new Error(`Fallback model failed with status ${response.status}`);
+        } catch (fallbackErr) {
+            print(C.red, `\nAPI Error: Both primary and fallback models failed.`);
+            history.pop(); // remove user input from history
+            return;
+        }
+    }
 
+    try {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
@@ -562,7 +569,7 @@ async function main() {
         }
 
     } catch (err) {
-      print(C.red, `\nAPI Error: ${err.message}`)
+      print(C.red, `\nAPI Error during stream: ${err.message}`)
       history.pop(); return;
     }
 
@@ -604,22 +611,7 @@ async function main() {
 
     switch (cmd) {
       case ":help":
-        print(C.cyan, `Commands:
-  :load <file>          Inject file into context
-  :scan [dir] [.ext]    List files (e.g. :scan src .js .py)
-  :context              Show loaded files
-  :clear                Drop file context, keep history
-  :reset                Wipe files + history (local)
-  :save [file]          Save last code block (no arg = CF flush)
-  :run <file.py>        Execute Python, inject output into next message
-  :write <file> [lang]  Extract last code block and write to file
-  :notes [tag]          Show memory notes (optional tag filter)
-  :flush                Manual flush to Cloudflare
-  :dir [path]           Change working directory
-  :pwd                  Print working directory
-  :project [name]       Show or set project name
-  :handoff              Handoff session to Firebase Studio
-  :exit / :quit         Exit`);
+        print(C.cyan, `Commands:\n  :load <file>          Inject file into context\n  :scan [dir] [.ext]    List files (e.g. :scan src .js .py)\n  :context              Show loaded files\n  :clear                Drop file context, keep history\n  :reset                Wipe files + history (local)\n  :save [file]          Save last code block (no arg = CF flush)\n  :run <file.py>        Execute Python, inject output into next message\n  :write <file> [lang]  Extract last code block and write to file\n  :notes [tag]          Show memory notes (optional tag filter)\n  :flush                Manual flush to Cloudflare\n  :dir [path]           Change working directory\n  :pwd                  Print working directory\n  :project [name]       Show or set project name\n  :handoff              Handoff session to Firebase Studio\n  :exit / :quit         Exit`);
         break;
       case ":pwd": print(C.cyan, CONFIG.context_dir); break;
       case ":dir": {
