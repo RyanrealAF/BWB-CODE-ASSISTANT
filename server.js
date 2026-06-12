@@ -1,38 +1,40 @@
 import express from 'express';
-import cors from 'cors';
-import { exec } from 'child_process';
-import ArchetypeCache from './engine/archetype-cache.js';
+import { chat } from './claude.js';
+import { getProjectContext } from './context.js';
 
 const app = express();
 const port = 3000;
-const archetypes = new ArchetypeCache();
 
-app.use(cors());
-app.use(express.json());
 app.use(express.static('public'));
+app.use(express.json());
 
-app.post('/api/myth', (req, res) => {
-  const { seed } = req.body;
+let history = [];
 
-  if (!seed) {
-    return res.status(400).json({ error: 'Seed is required' });
-  }
+app.post('/chat', async (req, res) => {
+  const { message } = req.body;
+  history.push({ role: 'user', content: message });
 
-  exec(`node index.js myth "${seed}"`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`exec error: ${error}`);
-      return res.status(500).json({ error: 'Failed to generate myth' });
-    }
-    res.json({ myth: stdout });
-  });
-});
-
-app.get('/api/archetypes', async (req, res) => {
   try {
-    const allArchetypes = await archetypes.getArchetypes();
-    res.json(allArchetypes);
+    const projectContext = await getProjectContext();
+    const stream = await chat(projectContext, history);
+    
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    let fullResponse = "";
+    for await (const chunk of stream) {
+      fullResponse += chunk;
+      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+    }
+    
+hn    history.push({ role: 'assistant', content: fullResponse });
+    res.end();
+
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get archetypes' });
+    console.error(error);
+    res.status(500).json({ error: error.message });
+    history.pop(); // Remove user message if chat fails
   }
 });
 
