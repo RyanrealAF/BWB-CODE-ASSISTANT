@@ -7,8 +7,8 @@ This project is an interactive code assistant that runs in a REPL (Read-Eval-Pri
 ## Key Features
 
 *   **Interactive REPL:** The assistant is accessed through a command-line REPL, allowing for a conversational and interactive coding experience.
-*   **Multi-Modal AI Support:** The assistant can be configured to use different AI models, including:
-    *   **Claude:** For powerful and creative code generation.
+*   **Multi-Modal AI Support:** The assistant can be configured to use different AI models, including:7l in
+    *   **Claude:** For poweul and creative code generation.
     *   **Gemini:** For fast and efficient code completion and suggestions.
     *   **Groq:** For high-performance and low-latency responses.
 *   **Job-Based Architecture:** The project is evolving to support a job-based architecture using Firebase and Ollama. This will allow for offline or on-device processing of AI tasks, making the assistant more resilient and versatile.
