@@ -5,3 +5,9 @@ BWB_Urban_Myth_Engine_Dev_Guide.docx
 BWB_Urban_Myth_Engine_Dev_Guide.txt
 untitled.txt
 .idx
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example

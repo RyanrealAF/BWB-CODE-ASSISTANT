@@ -9,7 +9,9 @@
   },
   "scripts": {
     "start": "node index.js",
-    "studio": "cd studio && npm install && npm run dev"
+    "studio": "cd studio && npm install && npm run dev",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",
@@ -22,5 +24,8 @@
     "node": ">=18.0.0"
   },
   "author": "RyanrealAF / Build While Bleeding",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.100.0"
+  }
 }
