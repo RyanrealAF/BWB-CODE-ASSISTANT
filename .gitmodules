@@ -1,0 +1,4 @@
+[submodule "packages/syllabusandstars"]
+	path = packages/syllabusandstars
+	url = https://github.com/RyanrealAF/Syllabusandstars.git
+	branch = main
