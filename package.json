@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",
-    "@google/generative-ai": "^0.11.0",
+    "@google/genai": "^2.8.0",
     "dotenv": "^16.4.5",
     "firebase": "^12.14.0",
     "sql.js": "^1.14.1"

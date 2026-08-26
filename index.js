@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { handleMythCommand } from "./commands/myth.js";
 import readline from "readline";
 import fs from "fs";
@@ -7,11 +7,12 @@ import path from "path";
 import os from "os";
 import { execSync, spawnSync } from "child_process";
 
+// ENTRY POINT: Gemini API Key — aistudio.google.com/apikey
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 const CONFIG = {
-  model:              process.env.GEMINI_MODEL || "gemini-pro",
+  model:              process.env.GEMINI_MODEL || "gemini-2.5-flash",
   max_tokens:         4096,
   max_file_bytes:     80_000,
   max_history_turns:  6,
@@ -23,6 +24,8 @@ const CONFIG = {
   cf_kv_namespace_id: process.env.CF_KV_NS_ID    || "REPLACE_WITH_KV_NS_ID",
   cf_d1_database:     process.env.CF_D1_DB       || "bwb_memory",
   project_name:       process.env.BWB_PROJECT     || path.basename(process.cwd()),
+  // ENTRY POINT: Gemini API Key, threaded to UrbanMythEngine — aistudio.google.com/apikey
+  gemini_api_key:     GEMINI_API_KEY,
 };
 
 const SYSTEM_MAIN = `You are a precision code assistant embedded in a Termux development environment.
@@ -174,14 +177,14 @@ function esc(str) { return String(str || "").replace(/'/g, "''"); }
 
 async function evaluateSignal(lastUserMsg, lastAssistantMsg) {
   try {
-    const model = genAI.getGenerativeModel({ model: CONFIG.model });
-    const result = await model.generateContent({
+    const result = await genAI.models.generateContent({
+      model: CONFIG.model,
       contents: [
         { role: "user", parts: [{ text: `USER: ${lastUserMsg}\n\nASSISTANT: ${lastAssistantMsg}` }] }
       ],
-      systemInstruction: SYSTEM_SIGNAL_EVAL,
+      config: { systemInstruction: SYSTEM_SIGNAL_EVAL },
     });
-    const response = result.response.text();
+    const response = result.text;
     if (!response || response.trim() === '{}') {
       return { has_signal: false, signal_type: "none", note: "Empty response from model", tags: ["eval-fail"] };
     }
@@ -515,20 +518,19 @@ async function main() {
     let fullResponse = "";
 
     try {
-      const model = genAI.getGenerativeModel({ model: CONFIG.model });
-      
       // Convert history to Gemini format
       const geminiMessages = history.map(msg => ({
         role: msg.role === "user" ? "user" : "model",
         parts: [{ text: msg.content }]
       }));
 
-      const result = await model.generateContent({
+      const result = await genAI.models.generateContent({
+        model: CONFIG.model,
         contents: geminiMessages,
-        systemInstruction: SYSTEM_MAIN,
+        config: { systemInstruction: SYSTEM_MAIN },
       });
 
-      const response = result.response.text();
+      const response = result.text;
       fullResponse = response;
       process.stdout.write(response);
 
