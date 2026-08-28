@@ -1,0 +1,8 @@
+{
+  "name": "BWB Code Assistant & Studio",
+  "description": "Interactive Gemini-powered code assistant and Urban Myth Engine with BWB Studio web interface.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

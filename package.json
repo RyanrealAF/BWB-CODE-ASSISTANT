@@ -8,13 +8,17 @@
     "bwb": "./index.js"
   },
   "scripts": {
-    "start": "node index.js",
+    "dev": "node server.js",
+    "build": "cd studio && npm install --include=dev && npm run build",
+    "start": "node server.js",
+    "repl": "node index.js",
     "studio": "cd studio && npm install && npm run dev"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",
     "@google/genai": "^2.8.0",
     "dotenv": "^16.4.5",
+    "express": "^5.2.1",
     "firebase": "^12.14.0",
     "sql.js": "^1.14.1"
   },
